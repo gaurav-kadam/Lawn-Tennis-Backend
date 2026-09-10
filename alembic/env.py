@@ -19,7 +19,7 @@ from app.models.role import Role
 from app.models.tournament import Tournament
 from app.models.player import Player
 from app.models.official import Official
-from app.models.match import Match, MatchSet, MatchPointLog
+from app.models.match import Match, MatchSet, MatchEvent
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
