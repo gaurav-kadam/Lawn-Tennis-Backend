@@ -3,35 +3,44 @@ from sqlalchemy.orm import Session
 
 from app.db.session import get_db
 from app.schemas.match import (
-    MatchCreate, MatchUpdate, MatchResponse, PointCreate,
-    MatchScoreboardResponse, SetScoreResponse,
+    MatchCreate, MatchUpdate, MatchResponse,
+    MatchScoreboardResponse, SetScoreResponse, FinalizeMatchRequest, MatchEventResponse,
 )
-from app.schemas.log import PointLogResponse
 from app.services.match_service import MatchService
+from app.services.serving_state import from_legacy, serving_state_to_dict
 from app.middleware.auth_middleware import verify_token, require_roles
 
 router = APIRouter()
-
-# Match metadata (create/edit/delete a match record) is an Admin action.
-# Recording points/undo during a live match is done by the Scorer (and Admin).
-# Everyone logged in (Admin/Scorer/Supervisor) can read match data and the scoreboard.
 manage_match = require_roles("Admin")
 score_match = require_roles("Admin", "Scorer")
 
 
 def _scoreboard_payload(result: dict):
+    match_response = _match_response(result["match"])
     return MatchScoreboardResponse(
-        match=MatchResponse.model_validate(result["match"]),
+        match=match_response,
         completed_sets=[SetScoreResponse.model_validate(s) for s in result["completed_sets"]],
         player1_display_point=result["player1_display_point"],
         player2_display_point=result["player2_display_point"],
     )
 
 
+def _match_response(match):
+    response = MatchResponse.model_validate(match)
+    if response.serving_state is None:
+        legacy_state = from_legacy(
+            match.match_type,
+            match.first_server,
+            match.service_order,
+        )
+        response.serving_state = dict(serving_state_to_dict(legacy_state))
+    return response
+
+
 @router.post("/matches")
 def create_match(payload: MatchCreate, current_user=Depends(manage_match), db: Session = Depends(get_db)):
     result = MatchService.create_match(db, payload)
-    return {"message": "Match created successfully", "data": MatchResponse.model_validate(result)}
+    return {"message": "Match created successfully", "data": _match_response(result)}
 
 
 @router.get("/matches")
@@ -46,7 +55,7 @@ def get_matches(
     return {
         "message": "Matches fetched successfully",
         "data": {
-            "items": [MatchResponse.model_validate(m) for m in matches],
+            "items": [_match_response(m) for m in matches],
             "total": total,
             "page": page,
             "page_size": page_size,
@@ -57,13 +66,13 @@ def get_matches(
 @router.get("/matches/{match_id}")
 def get_match(match_id: int, current_user=Depends(verify_token), db: Session = Depends(get_db)):
     match = MatchService.get_match_by_id(db, match_id)
-    return {"message": "Match fetched successfully", "data": MatchResponse.model_validate(match)}
+    return {"message": "Match fetched successfully", "data": _match_response(match)}
 
 
 @router.put("/matches/{match_id}")
 def update_match(match_id: int, payload: MatchUpdate, current_user=Depends(manage_match), db: Session = Depends(get_db)):
     result = MatchService.update_match(db, match_id, payload)
-    return {"message": "Match updated successfully", "data": MatchResponse.model_validate(result)}
+    return {"message": "Match updated successfully", "data": _match_response(result)}
 
 
 @router.delete("/matches/{match_id}")
@@ -76,7 +85,7 @@ def delete_match(match_id: int, current_user=Depends(manage_match), db: Session 
 @router.post("/matches/{match_id}/restore")
 def restore_match(match_id: int, current_user=Depends(manage_match), db: Session = Depends(get_db)):
     result = MatchService.restore_match(db, match_id)
-    return {"message": "Match restored successfully", "data": MatchResponse.model_validate(result)}
+    return {"message": "Match restored successfully", "data": _match_response(result)}
 
 
 # ---------- Live scoring ----------
@@ -87,19 +96,41 @@ def get_scoreboard(match_id: int, current_user=Depends(verify_token), db: Sessio
     return {"message": "Scoreboard fetched successfully", "data": _scoreboard_payload(result)}
 
 
-@router.post("/matches/{match_id}/points")
-def add_point(match_id: int, payload: PointCreate, current_user=Depends(score_match), db: Session = Depends(get_db)):
-    result = MatchService.add_point(db, match_id, payload)
-    return {"message": "Point recorded successfully", "data": _scoreboard_payload(result)}
+@router.get("/matches/{match_id}/events")
+def get_match_events(
+        match_id: int,
+        current_user=Depends(verify_token),
+        db: Session = Depends(get_db),
+):
+    events = MatchService.get_match_events(
+        db,
+        match_id,
+    )
 
+    return {
+        "message": "Match events fetched successfully",
+        "data": [
+            MatchEventResponse.model_validate(event)
+            for event in events
+        ],
+    }
 
-@router.post("/matches/{match_id}/undo")
-def undo_point(match_id: int, current_user=Depends(score_match), db: Session = Depends(get_db)):
-    result = MatchService.undo_last_point(db, match_id)
-    return {"message": "Last point undone successfully", "data": _scoreboard_payload(result)}
+@router.post(
+    "/matches/{match_id}/finalize",
+)
+def finalize_match(
+        match_id: int,
+        data: FinalizeMatchRequest,
+        current_user=Depends(score_match),
+        db: Session = Depends(get_db),
+):
+        result = MatchService.finalize_match(
+            db=db,
+            match_id=match_id,
+            data=data,
+        )
 
-
-@router.get("/matches/{match_id}/logs")
-def get_logs(match_id: int, current_user=Depends(verify_token), db: Session = Depends(get_db)):
-    logs = MatchService.get_point_logs(db, match_id)
-    return {"message": "Point logs fetched successfully", "data": [PointLogResponse.model_validate(l) for l in logs]}
+        return {
+            "message": "Match finalized successfully",
+            "data": _scoreboard_payload(result),
+        }

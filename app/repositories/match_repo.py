@@ -1,12 +1,8 @@
-from datetime import datetime, timezone
 from sqlalchemy.orm import Session
-from sqlalchemy.exc import SQLAlchemyError
 
-from app.models.match import Match, MatchSet, MatchPointLog
+from app.models.match import Match, MatchSet, MatchEvent
 from app.utils.soft_delete import SoftDeleteHelper
 from app.exceptions.db_safety import safe_commit, safe_query_delete
-from app.exceptions.custom_exceptions import DatabaseException
-from app.utils.logger import logger
 
 
 class MatchRepository:
@@ -18,11 +14,14 @@ class MatchRepository:
         return safe_commit(db, match, "create_match")
 
     @staticmethod
-    def get_match_by_id(db: Session, match_id: int):
-        return db.query(Match).filter(
+    def get_match_by_id(db: Session, match_id: int, for_update: bool = False):
+        query = db.query(Match).filter(
             Match.id == match_id,
             Match.is_deleted == False
-        ).first()
+        )
+        if for_update:
+            query = query.with_for_update()
+        return query.first()
 
     @staticmethod
     def get_all_matches(
@@ -90,69 +89,6 @@ class MatchRepository:
         return SoftDeleteHelper.restore(db, match)
 
     @staticmethod
-    def get_point_logs(db: Session, match_id: int):
-        return (
-            db.query(MatchPointLog)
-            .filter(MatchPointLog.match_id == match_id)
-            .order_by(MatchPointLog.point_number)
-            .all()
-        )
-
-    @staticmethod
-    def add_point_log(
-            db: Session,
-            data: dict,
-            commit: bool = True
-    ):
-        log = MatchPointLog(
-            **data,
-            created_at=datetime.now(timezone.utc)
-        )
-
-        db.add(log)
-
-        return safe_commit(
-            db,
-            log,
-            "add_point_log",
-            commit=commit
-        )
-
-    @staticmethod
-    def delete_last_point_log(
-            db: Session,
-            match_id: int,
-            commit: bool = True
-    ):
-        last = (
-            db.query(MatchPointLog)
-            .filter(MatchPointLog.match_id == match_id)
-            .order_by(MatchPointLog.point_number.desc())
-            .first()
-        )
-
-        if not last:
-            return None
-
-        try:
-            db.delete(last)
-
-            if commit:
-                db.commit()
-            else:
-                db.flush()
-
-        except SQLAlchemyError as e:
-            db.rollback()
-            logger.error(
-                f"Database error: {str(e)}",
-                exc_info=True
-            )
-            raise DatabaseException()
-
-        return last
-
-    @staticmethod
     def get_match_sets(db: Session, match_id: int):
         return (
             db.query(MatchSet)
@@ -195,3 +131,78 @@ class MatchRepository:
             "delete_match_sets_after",
             commit=commit
         )
+    @staticmethod
+    def get_match_events(
+            db: Session,
+            match_id: int,
+    ) -> list[MatchEvent]:
+        return (
+            db.query(MatchEvent)
+            .filter(
+                MatchEvent.match_id == match_id
+            )
+            .order_by(
+                MatchEvent.event_number.asc()
+            )
+            .all()
+        )
+    @staticmethod
+    def create_match_events(
+            db: Session,
+            match_id: int,
+            events: list[dict],
+    ) -> list[MatchEvent]:
+
+            if not events:
+                return []
+
+            db_events = [
+                MatchEvent(
+                    match_id=match_id,
+                    event_number=event["event_number"],
+                    event_type=event["event_type"],
+                    player=event["player"],
+                    server=event.get("server"),
+                    elapsed_seconds=event.get(
+                        "elapsed_seconds",
+                        0,
+                    ),
+                    recorded_at=event.get(
+                        "recorded_at"
+                    ),
+                )
+                for event in events
+            ]
+
+            db.add_all(db_events)
+
+            return db_events
+    @staticmethod
+    def delete_match_events(
+            db: Session,
+            match_id: int,
+    ) -> None:
+        (
+            db.query(MatchEvent)
+            .filter(
+                MatchEvent.match_id == match_id
+            )
+            .delete(
+                synchronize_session=False
+            )
+        )
+
+    @staticmethod
+    def has_match_events(
+            db: Session,
+            match_id: int,
+    ) -> bool:
+
+            return (
+                    db.query(MatchEvent.id)
+                    .filter(
+                        MatchEvent.match_id == match_id
+                    )
+                    .first()
+                    is not None
+            )

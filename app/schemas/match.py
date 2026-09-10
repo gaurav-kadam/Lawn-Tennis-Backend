@@ -1,15 +1,12 @@
 from pydantic import BaseModel, Field, model_validator
 from typing import Optional, List, Literal
-from datetime import date, time
+from datetime import date, time, datetime
+from enum import Enum
 
 PlayerSlot = Literal["PLAYER1", "PLAYER2"]
 IndividualPlayerSlot = Literal["PLAYER1", "PLAYER2", "PLAYER3", "PLAYER4"]
 MatchFormat = Literal["BEST_OF_3", "BEST_OF_5"]
 MatchType = Literal["SINGLES", "DOUBLES"]
-PointType = Literal[
-    "NORMAL", "ACE", "WINNER", "FORCED_ERROR",
-    "UNFORCED_ERROR", "DOUBLE_FAULT", "FAULT"
-]
 
 
 class MatchCreate(BaseModel):
@@ -35,6 +32,7 @@ class MatchCreate(BaseModel):
     player3_id: Optional[int] = None
     player4_id: Optional[int] = None
     service_order: List[IndividualPlayerSlot] = Field(default_factory=list)
+    serving_state: Optional[dict] = None
 
     match_format: MatchFormat = "BEST_OF_3"
 
@@ -54,17 +52,22 @@ class MatchCreate(BaseModel):
             if not self.player4_name or not self.player4_name.strip():
                 raise ValueError("player4_name is required for DOUBLES")
 
-            if len(self.service_order) != 4:
-                raise ValueError("service_order must contain 4 players")
+            if self.service_order:
+                if len(self.service_order) != 4:
+                    raise ValueError("service_order must contain 4 players")
 
-            if len(set(self.service_order)) != 4:
-                raise ValueError("service_order must not contain duplicates")
+                if len(set(self.service_order)) != 4:
+                    raise ValueError("service_order must not contain duplicates")
 
-            if set(self.service_order) != {
-                "PLAYER1", "PLAYER2", "PLAYER3", "PLAYER4"
-            }:
+                if set(self.service_order) != {
+                    "PLAYER1", "PLAYER2", "PLAYER3", "PLAYER4"
+                }:
+                    raise ValueError(
+                        "service_order must contain PLAYER1, PLAYER2, PLAYER3 and PLAYER4"
+                    )
+            elif not isinstance(self.serving_state, dict):
                 raise ValueError(
-                    "service_order must contain PLAYER1, PLAYER2, PLAYER3 and PLAYER4"
+                    "DOUBLES requires service_order or serving_state configuration"
                 )
 
         else:
@@ -98,11 +101,10 @@ class MatchUpdate(BaseModel):
     player3_name: Optional[str] = Field(None, max_length=150)
     player4_name: Optional[str] = Field(None, max_length=150)
     service_order: Optional[List[IndividualPlayerSlot]] = None
+    serving_state: Optional[dict] = None
 
     @model_validator(mode="after")
     def validate_service_order(self):
-        # service_order is optional during update.
-        # Empty list means "no doubles service-order update".
         if self.service_order:
             if (
                     len(self.service_order) != 4
@@ -117,14 +119,7 @@ class MatchUpdate(BaseModel):
                 raise ValueError(
                     "service_order must contain PLAYER1, PLAYER2, PLAYER3 and PLAYER4"
                 )
-
         return self
-
-
-class PointCreate(BaseModel):
-    winner: PlayerSlot
-    point_type: PointType = "NORMAL"
-    remarks: Optional[str] = Field(None, max_length=255)
 
 
 class SetScoreResponse(BaseModel):
@@ -134,6 +129,7 @@ class SetScoreResponse(BaseModel):
     was_tiebreak: bool
     tiebreak_player1_points: Optional[int] = None
     tiebreak_player2_points: Optional[int] = None
+    serving_state: Optional[dict] = None
 
     class Config:
         from_attributes = True
@@ -160,6 +156,7 @@ class MatchResponse(BaseModel):
     player4_name: Optional[str] = None
 
     service_order: List[str] = Field(default_factory=list)
+    serving_state: Optional[dict] = None
 
     match_format: str
     status: str
@@ -197,3 +194,100 @@ class MatchScoreboardResponse(BaseModel):
     completed_sets: List[SetScoreResponse]
     player1_display_point: str
     player2_display_point: str
+
+class MatchEventType(str, Enum):
+    POINT = "POINT"
+    ACE = "ACE"
+    FAULT = "FAULT"
+    DOUBLE_FAULT = "DOUBLE_FAULT"
+    SERVE = "SERVE"
+    WINNER = "WINNER"
+    UNFORCED_ERROR = "UNFORCED_ERROR"
+    FORCED_ERROR = "FORCED_ERROR"
+    VOLLEY = "VOLLEY"
+    NORMAL = "NORMAL"
+
+
+class FinalMatchEvent(BaseModel):
+    event_number: int = Field(..., ge=1)
+
+    event_type: MatchEventType
+
+    player: IndividualPlayerSlot
+
+    server: Optional[IndividualPlayerSlot] = None
+
+    elapsed_seconds: int = Field(
+        default=0,
+        ge=0,
+    )
+    recorded_at: Optional[datetime | int | float] = None
+
+
+class FinalSetState(BaseModel):
+    player1_games: int = Field(..., ge=0)
+    player2_games: int = Field(..., ge=0)
+
+    was_tiebreak: bool = False
+
+    tiebreak_player1_points: Optional[int] = None
+    tiebreak_player2_points: Optional[int] = None
+    serving_state: Optional[dict] = None
+
+
+class FinalMatchState(BaseModel):
+    player1_points: int = Field(..., ge=0)
+    player2_points: int = Field(..., ge=0)
+
+    player1_games: int = Field(..., ge=0)
+    player2_games: int = Field(..., ge=0)
+
+    player1_sets: int = Field(..., ge=0)
+    player2_sets: int = Field(..., ge=0)
+
+    is_tiebreak: bool = False
+
+    tiebreak_player1_points: int = Field(
+        default=0,
+        ge=0,
+    )
+
+    tiebreak_player2_points: int = Field(
+        default=0,
+        ge=0,
+    )
+
+    match_winner: Optional[PlayerSlot] = None
+
+    completed_sets: list[FinalSetState] = Field(
+        default_factory=list
+    )
+
+    serving_state: Optional[dict] = None
+
+
+class FinalizeMatchRequest(BaseModel):
+    final_state: FinalMatchState
+
+    events: List[FinalMatchEvent] = Field(
+        ...,
+        min_length=1,
+    )
+
+class MatchEventResponse(BaseModel):
+    id: int
+
+    event_number: int
+
+    event_type: MatchEventType
+
+    player: IndividualPlayerSlot
+
+    server: Optional[IndividualPlayerSlot] = None
+
+    elapsed_seconds: int
+
+    recorded_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
