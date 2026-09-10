@@ -28,9 +28,9 @@ def safe_commit(db: Session, obj, action: str, commit: bool = True):
     commit=False: only flush (assigns PKs / runs constraint checks without
                   ending the transaction) so several of these can be combined
                   into one atomic commit via the `transaction()` context
-                  manager below - needed for multi-step flows like recording
-                  a tennis point (point log + match state + set rows must all
-                  succeed or all fail together).
+                  manager below - needed when several related records must be
+                  persisted atomically so they all succeed or all fail
+                  together.
     """
     try:
         if commit:

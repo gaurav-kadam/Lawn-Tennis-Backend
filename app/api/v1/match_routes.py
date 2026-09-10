@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, Query
+from sqlalchemy import inspect
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
@@ -26,15 +27,24 @@ def _scoreboard_payload(result: dict):
 
 
 def _match_response(match):
-    response = MatchResponse.model_validate(match)
-    if response.serving_state is None:
+    serving_state = match.serving_state
+    if serving_state is None:
         legacy_state = from_legacy(
             match.match_type,
             match.first_server,
             match.service_order,
         )
-        response.serving_state = dict(serving_state_to_dict(legacy_state))
-    return response
+        serving_state = dict(serving_state_to_dict(legacy_state))
+
+    # Build from mapped columns so Pydantic does not evaluate the legacy
+    # Match.current_server property through from_attributes.
+    match_data = {
+        attribute.key: getattr(match, attribute.key)
+        for attribute in inspect(match).mapper.column_attrs
+    }
+    match_data["serving_state"] = serving_state
+    match_data["current_server"] = serving_state["current_server"]
+    return MatchResponse.model_validate(match_data)
 
 
 @router.post("/matches")

@@ -237,14 +237,6 @@ class Match(Base):
 
     # ============================================================
     # SERVER
-    #
-    # The tennis engine works with two scoring sides:
-    #
-    # PLAYER1
-    # PLAYER2
-    #
-    # For doubles, current_server calculates the individual
-    # player from service_order.
     # ============================================================
 
     first_server = Column(
@@ -387,55 +379,11 @@ class Match(Base):
         order_by="MatchSet.set_number",
     )
 
-    logs = relationship(
-        "MatchPointLog",
+    events = relationship(
+        "MatchEvent",
         back_populates="match",
-        order_by="MatchPointLog.point_number",
+        order_by="MatchEvent.event_number",
     )
-
-    # ============================================================
-    # CURRENT SERVER
-    # ============================================================
-
-    @property
-    def current_server(self) -> str:
-        if (
-                self.match_type != "DOUBLES"
-                or not self.service_order
-        ):
-            return self.server
-
-        # --------------------------------------------------------
-        # DOUBLES
-        # --------------------------------------------------------
-
-        completed_games = sum(
-            (
-                    s.player1_games +
-                    s.player2_games
-            )
-            for s in self.sets
-        )
-
-        current_set_games = (
-                (self.player1_games or 0) +
-                (self.player2_games or 0)
-        )
-
-        total_games = (
-                completed_games +
-                current_set_games
-        )
-
-        order = self.service_order
-
-        if not order:
-            return self.server
-
-        return order[
-            total_games % len(order)
-            ]
-
 
 # ================================================================
 # MATCH SET
@@ -494,12 +442,8 @@ class MatchSet(Base):
     )
 
 
-# ================================================================
-# MATCH POINT LOG
-# ================================================================
-
-class MatchPointLog(Base):
-    __tablename__ = "match_point_logs"
+class MatchEvent(Base):
+    __tablename__ = "match_events"
 
     id = Column(
         Integer,
@@ -511,63 +455,42 @@ class MatchPointLog(Base):
         Integer,
         ForeignKey("matches.id"),
         nullable=False,
+        index=True,
     )
 
-    point_number = Column(
+    event_number = Column(
         Integer,
         nullable=False,
     )
 
-    set_number = Column(
-        Integer,
+    event_type = Column(
+        String(30),
         nullable=False,
     )
 
-    game_number = Column(
-        Integer,
-        nullable=False,
-    )
-
-    # PLAYER1 / PLAYER2
-    winner = Column(
+    player = Column(
         String(10),
         nullable=False,
     )
 
-    # PLAYER1 / PLAYER2
     server = Column(
         String(10),
+        nullable=True,
+    )
+
+    elapsed_seconds = Column(
+        Integer,
         nullable=False,
+        default=0,
+        server_default="0",
     )
 
-    point_type = Column(
-        String(20),
-        nullable=False,
-        default="NORMAL",
-        server_default="NORMAL",
-    )
-
-    player1_score_after = Column(
-        String(10),
-        nullable=True,
-    )
-
-    player2_score_after = Column(
-        String(10),
-        nullable=True,
-    )
-
-    remarks = Column(
-        String(255),
-        nullable=True,
-    )
-
-    created_at = Column(
+    recorded_at = Column(
         DateTime,
         nullable=True,
     )
 
     match = relationship(
         "Match",
-        back_populates="logs",
+        back_populates="events",
     )
