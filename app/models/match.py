@@ -184,6 +184,11 @@ class Match(Base):
         server_default="[]",
     )
 
+    serving_state = Column(
+        JSON,
+        nullable=True,
+    )
+
     # ============================================================
     # OFFICIALS
     # ============================================================
@@ -433,6 +438,11 @@ class MatchSet(Base):
 
     tiebreak_player2_points = Column(
         Integer,
+        nullable=True,
+    )
+
+    serving_state = Column(
+        JSON,
         nullable=True,
     )
 
