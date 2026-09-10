@@ -7,6 +7,7 @@ from app.api.v1 import (
     tournament_routes,
     official_routes,
     player_routes,
+    team_routes,
     match_routes,
     dashboard_routes,
 )
@@ -19,7 +20,7 @@ from app.models.role import Role
 from app.models.tournament import Tournament
 from app.models.player import Player
 from app.models.official import Official
-from app.models.match import Match, MatchSet, MatchPointLog
+from app.models.match import Match, MatchSet, MatchEvent
 
 from app.db.session import engine, SessionLocal
 from app.seeds.role_Seed import seed_roles
@@ -65,6 +66,7 @@ app.include_router(player_routes.router, prefix="/api/v1", tags=["Players"])
 app.include_router(official_routes.router, prefix="/api/v1", tags=["Officials"])
 app.include_router(match_routes.router, prefix="/api/v1", tags=["Matches"])
 app.include_router(dashboard_routes.router,prefix="/api/v1",tags=["Dashboard"])
+app.include_router(team_routes.router,prefix="/api/v1",tags=["Teams"])
 
 
 @app.get("/")
