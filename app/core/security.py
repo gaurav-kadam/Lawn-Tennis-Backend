@@ -14,15 +14,6 @@ def validate_password(password: str):
 
 
 def hash_password(password: str) -> str:
-    """
-    Uses the `bcrypt` library directly rather than passlib's bcrypt wrapper.
-    passlib 1.7.x ships a self-test (detect_wrap_bug) that is incompatible
-    with bcrypt >= 4.1 and raises ValueError on every single hash/verify call
-    - a real production landmine (password hashing, i.e. register/login,
-    would be completely broken). Calling bcrypt directly avoids that broken
-    compatibility shim entirely while keeping the exact same hash format
-    ($2b$...), so existing stored hashes remain valid either way.
-    """
     validate_password(password)
     hashed = bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt())
     return hashed.decode("utf-8")
@@ -33,8 +24,6 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
     try:
         return bcrypt.checkpw(plain_password.encode("utf-8"), hashed_password.encode("utf-8"))
     except ValueError:
-        # Malformed/corrupted stored hash - treat as "does not match" rather
-        # than crashing the request with a 500.
         return False
 
 

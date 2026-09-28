@@ -1,12 +1,5 @@
-"""Serving-state serialization and compatibility helpers.
-
-The frontend owns live scoring and serving. This module validates and
-normalizes serving metadata that is persisted with matches and sets.
-"""
-
 from dataclasses import dataclass
 from typing import Iterable, Mapping, Optional, Tuple
-
 
 PLAYER1 = "PLAYER1"
 PLAYER2 = "PLAYER2"
@@ -57,7 +50,9 @@ def _validate_doubles_order(order: Iterable[str]) -> Tuple[str, ...]:
     return normalized
 
 
-def _interleaved_doubles_order(first_server: str, opposing_first_server: str) -> Tuple[str, ...]:
+def _interleaved_doubles_order(
+    first_server: str, opposing_first_server: str
+) -> Tuple[str, ...]:
     _validate_player(first_server)
     _validate_player(opposing_first_server)
     if team_for_player(first_server) == team_for_player(opposing_first_server):
@@ -72,7 +67,6 @@ def _interleaved_doubles_order(first_server: str, opposing_first_server: str) ->
 
 @dataclass(frozen=True)
 class ServingState:
-    """Serving state independent of point-scoring state."""
 
     match_type: str
     first_server: str
@@ -120,7 +114,7 @@ def initialize_from_config(
     opposing_first_server: Optional[str] = None,
     service_order: Optional[Iterable[str]] = None,
 ) -> ServingState:
-    """Initialize new-match state from creation configuration."""
+
     if match_type == "SINGLES":
         return initialize_singles(first_server)
     if match_type != "DOUBLES":
@@ -137,7 +131,6 @@ def from_legacy(
     first_server: str,
     service_order: Optional[Iterable[str]] = None,
 ) -> ServingState:
-    """Build state for records created before serving_state was persisted."""
     if match_type == "SINGLES":
         return initialize_singles(first_server)
 
@@ -156,8 +149,6 @@ def from_legacy(
             doubles_serve_index=0,
         )
 
-    # Legacy doubles rows without an order only know the scoring side. Keep
-    # that side-level value instead of inventing an individual player.
     if first_server not in (PLAYER1, PLAYER2):
         raise ValueError("Legacy doubles first_server must be PLAYER1 or PLAYER2")
     return ServingState(
@@ -183,22 +174,51 @@ def serving_state_to_dict(state: ServingState) -> Mapping[str, object]:
 
 
 def serving_state_from_dict(data: Mapping[str, object]) -> ServingState:
-    order = tuple(data.get("current_set_service_order") or ())
-    match_type = str(data.get("match_type") or "SINGLES")
-    first_server = str(data.get("first_server"))
-    current_server = str(data.get("current_server"))
-    current_set_first_server = str(data.get("current_set_first_server") or first_server)
-    if match_type == "DOUBLES" and order:
-        _validate_doubles_order(order)
-    elif match_type == "SINGLES":
-        _other_singles_player(first_server)
+    """Validate snapshot structure only; never advance or infer service turns."""
+    match_type = data.get("match_type", "SINGLES")
+    if match_type not in ("SINGLES", "DOUBLES"):
+        raise ValueError("Unknown serving-state match type")
+    valid_players = DOUBLES_PLAYERS if match_type == "DOUBLES" else {PLAYER1, PLAYER2}
+    first_server = data.get("first_server")
+    current_server = data.get("current_server")
+    current_set_first_server = data.get("current_set_first_server", first_server)
+    tiebreak_first_server = data.get("tiebreak_first_server")
+    for player in (first_server, current_server, current_set_first_server):
+        if not isinstance(player, str) or player not in valid_players:
+            raise ValueError("Invalid serving-state player slot")
+    if tiebreak_first_server is not None and (
+        not isinstance(tiebreak_first_server, str)
+        or tiebreak_first_server not in valid_players
+    ):
+        raise ValueError("Invalid tiebreak first server")
+    for key in ("current_set_service_order", "service_order"):
+        order = data.get(key, [])
+        if not isinstance(order, (list, tuple)):
+            raise ValueError("Service order must be a player-slot list")
+        if any(
+            not isinstance(player, str) or player not in valid_players
+            for player in order
+        ):
+            raise ValueError("Invalid service-order player slot")
+        # Empty orders remain compatible with legacy snapshots.
+        if order and (len(order) != len(valid_players) or set(order) != valid_players):
+            raise ValueError(
+                "Service order must contain each match player exactly once"
+            )
+    order = tuple(data.get("current_set_service_order", []))
+    index = data.get("doubles_serve_index", 0)
+    if type(index) is not int or not 0 <= index < len(valid_players):
+        raise ValueError("Invalid serving-state service index")
+    is_tiebreak = data.get("is_tiebreak", False)
+    if type(is_tiebreak) is not bool:
+        raise ValueError("Serving-state is_tiebreak must be a boolean")
     return ServingState(
         match_type=match_type,
         first_server=first_server,
         current_server=current_server,
         current_set_first_server=current_set_first_server,
         current_set_service_order=order,
-        doubles_serve_index=int(data.get("doubles_serve_index") or 0),
-        tiebreak_first_server=data.get("tiebreak_first_server") or None,
-        is_tiebreak=bool(data.get("is_tiebreak", False)),
+        doubles_serve_index=index,
+        tiebreak_first_server=tiebreak_first_server,
+        is_tiebreak=is_tiebreak,
     )

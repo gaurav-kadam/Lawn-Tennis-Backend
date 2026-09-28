@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, Date, Time, ForeignKey, JSON
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, Date, Time, ForeignKey, JSON, UniqueConstraint
 from sqlalchemy.orm import relationship
 from app.db.base import Base
 
@@ -78,6 +78,13 @@ class Match(Base):
 
 class MatchSet(Base):
     __tablename__ = "match_sets"
+    __table_args__ = (
+        UniqueConstraint(
+            "match_id",
+            "set_number",
+            name="uq_match_sets_match_id_set_number",
+        ),
+    )
 
     id = Column(Integer, primary_key=True, index=True)
     match_id = Column(Integer, ForeignKey("matches.id"), nullable=False)
@@ -98,6 +105,13 @@ class MatchSet(Base):
 
 class MatchEvent(Base):
     __tablename__ = "match_events"
+    __table_args__ = (
+        UniqueConstraint(
+            "match_id",
+            "event_number",
+            name="uq_match_events_match_id_event_number",
+        ),
+    )
 
     id = Column(Integer, primary_key=True, index=True)
     match_id = Column(Integer, ForeignKey("matches.id"), nullable=False, index=True)

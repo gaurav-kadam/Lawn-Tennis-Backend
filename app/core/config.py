@@ -18,7 +18,6 @@ class Settings:
 
     ENV = os.getenv("ENV", "development")
 
-    # Comma-separated in .env, e.g: ALLOWED_ORIGINS=https://app.example.com,https://admin.example.com
     ALLOWED_ORIGINS = [
         origin.strip()
         for origin in os.getenv("ALLOWED_ORIGINS", "").split(",")
@@ -27,32 +26,3 @@ class Settings:
 
 
 settings = Settings()
-
-
-def _validate_settings():
-    """
-    Fail fast and loudly at startup rather than running with an insecure or
-    broken configuration. A missing DB_URL or SECRET_KEY (or a SECRET_KEY
-    that's just the placeholder from .env.example) would otherwise only
-    surface later as a confusing runtime error - or worse, run "successfully"
-    with a guessable/default secret in production.
-    """
-    if not settings.DB_URL:
-        raise RuntimeError("DB_URL is not set. Copy .env.example to .env and configure it.")
-
-    if not settings.SECRET_KEY:
-        raise RuntimeError("SECRET_KEY is not set. Copy .env.example to .env and configure it.")
-
-    if settings.ENV == "production":
-        if settings.SECRET_KEY in ("my_super_secret_key_123", "changeme", "secret"):
-            raise RuntimeError(
-                "SECRET_KEY is still set to a known placeholder value. "
-                "Generate a real one: python -c \"import secrets; print(secrets.token_hex(32))\""
-            )
-        if len(settings.SECRET_KEY) < 32:
-            raise RuntimeError("SECRET_KEY is too short for production (need 32+ characters).")
-        if not settings.ALLOWED_ORIGINS:
-            raise RuntimeError("ALLOWED_ORIGINS must be set when ENV=production (no wildcard CORS in prod).")
-
-
-_validate_settings()

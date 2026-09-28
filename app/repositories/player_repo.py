@@ -7,6 +7,13 @@ from app.exceptions.db_safety import safe_commit
 class PlayerRepository:
 
     @staticmethod
+    def count_players(db: Session, is_active: bool | None = None):
+        query = db.query(Player).filter(Player.is_deleted == False)
+        if is_active is not None:
+            query = query.filter(Player.is_active == is_active)
+        return query.count()
+
+    @staticmethod
     def create_player(db: Session, data: dict):
         player = Player(**data)
         db.add(player)

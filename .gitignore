@@ -4,3 +4,4 @@ __pycache__/
 .env
 .idea/
 logs/*.log
+.pytest_cache/

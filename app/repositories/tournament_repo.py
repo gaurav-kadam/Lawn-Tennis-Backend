@@ -7,6 +7,13 @@ from app.exceptions.db_safety import safe_commit
 class TournamentRepository:
 
     @staticmethod
+    def count_tournaments(db: Session, is_active: bool | None = None):
+        query = db.query(Tournament).filter(Tournament.is_deleted == False)
+        if is_active is not None:
+            query = query.filter(Tournament.is_active == is_active)
+        return query.count()
+
+    @staticmethod
     def create_tournament(db: Session, data: dict):
         tournament = Tournament(**data)
         db.add(tournament)

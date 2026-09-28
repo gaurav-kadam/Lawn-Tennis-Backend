@@ -60,7 +60,10 @@ class MatchCreate(BaseModel):
                     raise ValueError("service_order must not contain duplicates")
 
                 if set(self.service_order) != {
-                    "PLAYER1", "PLAYER2", "PLAYER3", "PLAYER4"
+                    "PLAYER1",
+                    "PLAYER2",
+                    "PLAYER3",
+                    "PLAYER4",
                 }:
                     raise ValueError(
                         "service_order must contain PLAYER1, PLAYER2, PLAYER3 and PLAYER4"
@@ -107,14 +110,15 @@ class MatchUpdate(BaseModel):
     def validate_service_order(self):
         if self.service_order:
             if (
-                    len(self.service_order) != 4
-                    or len(set(self.service_order)) != 4
-                    or set(self.service_order) != {
-                "PLAYER1",
-                "PLAYER2",
-                "PLAYER3",
-                "PLAYER4",
-            }
+                len(self.service_order) != 4
+                or len(set(self.service_order)) != 4
+                or set(self.service_order)
+                != {
+                    "PLAYER1",
+                    "PLAYER2",
+                    "PLAYER3",
+                    "PLAYER4",
+                }
             ):
                 raise ValueError(
                     "service_order must contain PLAYER1, PLAYER2, PLAYER3 and PLAYER4"
@@ -195,6 +199,7 @@ class MatchScoreboardResponse(BaseModel):
     player1_display_point: str
     player2_display_point: str
 
+
 class MatchEventType(str, Enum):
     POINT = "POINT"
     ACE = "ACE"
@@ -230,8 +235,8 @@ class FinalSetState(BaseModel):
 
     was_tiebreak: bool = False
 
-    tiebreak_player1_points: Optional[int] = None
-    tiebreak_player2_points: Optional[int] = None
+    tiebreak_player1_points: Optional[int] = Field(default=None, ge=0)
+    tiebreak_player2_points: Optional[int] = Field(default=None, ge=0)
     serving_state: Optional[dict] = None
 
 
@@ -259,9 +264,7 @@ class FinalMatchState(BaseModel):
 
     match_winner: Optional[PlayerSlot] = None
 
-    completed_sets: list[FinalSetState] = Field(
-        default_factory=list
-    )
+    completed_sets: list[FinalSetState] = Field(default_factory=list)
 
     serving_state: Optional[dict] = None
 
@@ -274,19 +277,14 @@ class FinalizeMatchRequest(BaseModel):
         min_length=1,
     )
 
+
 class MatchEventResponse(BaseModel):
     id: int
-
     event_number: int
-
     event_type: MatchEventType
-
     player: IndividualPlayerSlot
-
     server: Optional[IndividualPlayerSlot] = None
-
     elapsed_seconds: int
-
     recorded_at: Optional[datetime] = None
 
     class Config:

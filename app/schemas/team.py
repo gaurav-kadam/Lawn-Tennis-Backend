@@ -5,18 +5,13 @@ from typing import Optional
 class TeamCreate(BaseModel):
     team_name: str = Field(..., min_length=1, max_length=150)
     short_name: str = Field(..., min_length=1, max_length=50)
-
     gender: str = Field(..., min_length=1, max_length=20)
-
     state: str = Field(..., min_length=1, max_length=100)
     city: str = Field(..., min_length=1, max_length=100)
-
     section: str = Field(..., min_length=1, max_length=100)
-
     head_coach: str = Field(..., min_length=1, max_length=150)
     coach: str = Field(..., min_length=1, max_length=150)
     manager: str = Field(..., min_length=1, max_length=150)
-
     player_file: Optional[str] = None
 
 

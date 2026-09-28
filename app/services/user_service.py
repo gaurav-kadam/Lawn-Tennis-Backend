@@ -7,8 +7,6 @@ from app.schemas.user import UserCreate, UserRegister, UserLogin, UserUpdate
 from app.core.security import hash_password, verify_password, create_access_token
 from app.utils.logger import logger
 
-# Role every public self-registration is forced into - the least-privileged
-# role in the system. Never trust a role coming from an unauthenticated caller.
 DEFAULT_PUBLIC_ROLE = "Scorer"
 
 
@@ -65,6 +63,9 @@ class UserService:
             logger.warning(f"User creation failed. Email already exists: {user.email}")
             raise ConflictException("Email already exists")
 
+        if not any(role.role_id == user.role_id for role in UserRepository.get_all_roles(db)):
+            raise BadRequestException("Invalid role")
+
         hashed_password = hash_password(user.password)
         created_user = UserRepository.create_user(db, {
             "name": user.name,
@@ -111,24 +112,12 @@ class UserService:
         }
 
     @staticmethod
-    def get_all_users(db: Session):
-        users = UserRepository.get_all_users(db)
-        return [
-            {
-                "id": u.id,
-                "name": u.name,
-                "email": u.email,
-                "role": {
-                    "role_id": u.role.role_id,
-                    "role_name": u.role.role_name,
-                    "is_active": u.role.is_active
-                } if u.role else None
-            }
-            for u in users
-        ]
+    def get_all_users(db: Session, skip: int = 0, limit: int | None = None):
+        users = UserRepository.get_all_users(db, skip, limit)
+        return [UserService._build_user_response(user) for user in users]
 
     @staticmethod
-    def getAllRoles(db: Session):
+    def get_all_roles(db: Session):
         return UserRepository.get_all_roles(db)
 
     @staticmethod
@@ -140,17 +129,13 @@ class UserService:
 
     @staticmethod
     def update_user(db: Session, user_id: int, user_data: UserUpdate):
-        existing_user = UserRepository.get_user_by_id(db, user_id)
-        if not existing_user:
-            raise NotFoundException("User not found")
+        existing_user = UserService.get_user_by_id(db, user_id)
         update_data = user_data.model_dump(exclude_unset=True)
         return UserRepository.update_user(db, existing_user, update_data)
 
     @staticmethod
     def delete_user(db: Session, user_id: int, deleted_by: int | None = None):
-        existing_user = UserRepository.get_user_by_id(db, user_id)
-        if not existing_user:
-            raise NotFoundException("User not found")
+        existing_user = UserService.get_user_by_id(db, user_id)
         UserRepository.delete_user(db, existing_user, deleted_by)
         return True
 

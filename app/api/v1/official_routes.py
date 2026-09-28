@@ -1,3 +1,4 @@
+from app.responses.response_builder import success_response
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
@@ -9,10 +10,17 @@ from app.middleware.auth_middleware import verify_token, require_roles
 router = APIRouter()
 
 
-@router.post("/officials")
-def create_official(payload: OfficialCreate, current_user=Depends(require_roles("Admin")), db: Session = Depends(get_db)):
+@router.post("/official")
+def create_official(
+    payload: OfficialCreate,
+    current_user=Depends(require_roles("Admin")),
+    db: Session = Depends(get_db),
+):
     result = OfficialService.create_official(db, payload)
-    return {"message": "Official created successfully", "data": OfficialResponse.model_validate(result)}
+    return success_response(
+        message="Official created successfully",
+        data=OfficialResponse.model_validate(result),
+    )
 
 
 @router.get("/officials")
@@ -24,37 +32,61 @@ def get_officials(
     db: Session = Depends(get_db),
 ):
     officials, total = OfficialService.get_all_officials(db, page, page_size, is_active)
-    return {
-        "message": "Officials fetched successfully",
-        "data": {
+    return success_response(
+        message="Officials fetched successfully",
+        data={
             "items": [OfficialResponse.model_validate(o) for o in officials],
             "total": total,
             "page": page,
             "page_size": page_size,
         },
-    }
+    )
 
 
-@router.get("/officials/{official_id}")
-def get_official(official_id: int, current_user=Depends(verify_token), db: Session = Depends(get_db)):
+@router.get("/official/{official_id}")
+def get_official(
+    official_id: int, current_user=Depends(verify_token), db: Session = Depends(get_db)
+):
     official = OfficialService.get_official_by_id(db, official_id)
-    return {"message": "Official fetched successfully", "data": OfficialResponse.model_validate(official)}
+    return success_response(
+        message="Official fetched successfully",
+        data=OfficialResponse.model_validate(official),
+    )
 
 
-@router.put("/officials/{official_id}")
-def update_official(official_id: int, payload: OfficialUpdate, current_user=Depends(require_roles("Admin")), db: Session = Depends(get_db)):
+@router.put("/official/{official_id}")
+def update_official(
+    official_id: int,
+    payload: OfficialUpdate,
+    current_user=Depends(require_roles("Admin")),
+    db: Session = Depends(get_db),
+):
     result = OfficialService.update_official(db, official_id, payload)
-    return {"message": "Official updated successfully", "data": OfficialResponse.model_validate(result)}
+    return success_response(
+        message="Official updated successfully",
+        data=OfficialResponse.model_validate(result),
+    )
 
 
-@router.delete("/officials/{official_id}")
-def delete_official(official_id: int, current_user=Depends(require_roles("Admin")), db: Session = Depends(get_db)):
+@router.delete("/official/{official_id}")
+def delete_official(
+    official_id: int,
+    current_user=Depends(require_roles("Admin")),
+    db: Session = Depends(get_db),
+):
     deleted_by = current_user.get("user_id")
     OfficialService.delete_official(db, official_id, deleted_by)
-    return {"message": "Official deleted successfully"}
+    return success_response(message="Official deleted successfully")
 
 
-@router.post("/officials/{official_id}/restore")
-def restore_official(official_id: int, current_user=Depends(require_roles("Admin")), db: Session = Depends(get_db)):
+@router.post("/official/{official_id}/restore")
+def restore_official(
+    official_id: int,
+    current_user=Depends(require_roles("Admin")),
+    db: Session = Depends(get_db),
+):
     result = OfficialService.restore_official(db, official_id)
-    return {"message": "Official restored successfully", "data": OfficialResponse.model_validate(result)}
+    return success_response(
+        message="Official restored successfully",
+        data=OfficialResponse.model_validate(result),
+    )

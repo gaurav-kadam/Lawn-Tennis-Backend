@@ -1,119 +1,66 @@
-from fastapi import FastAPI, Request, HTTPException
+from fastapi import FastAPI, Request
+from starlette.exceptions import HTTPException
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
 
+from app.responses.response_builder import error_response
 from app.exceptions.base import AppException
 from app.utils.logger import logger
 
 
-def build_error_response(
-    status_code: int,
-    message: str,
-    details=None
-):
-    """
-    Standard Error Response Builder
-    """
-
+def build_error_response(status_code: int, message: str, details=None, headers=None):
+    errors = details if details is None or isinstance(details, list) else [details]
+    response = error_response(message=message, errors=errors, status_code=status_code)
     return JSONResponse(
         status_code=status_code,
-        content={
-            "success": False,
-            "status": status_code,
-            "message": message,
-            "data": None,
-            "details": details
-        }
+        content=response.model_dump(mode="json"),
+        headers=headers,
     )
 
 
-async def app_exception_handler(
-    request: Request,
-    exc: AppException
-):
-    """
-    Handles all Custom Exceptions
-    """
-
-    logger.warning(
-        f"{request.method} {request.url.path} | {exc.message}"
-    )
+async def app_exception_handler(request: Request, exc: AppException):
+    logger.warning(f"{request.method} {request.url.path} | {exc.message}")
 
     return build_error_response(
-        status_code=exc.status_code,
-        message=exc.message,
-        details=exc.details
+        status_code=exc.status_code, message=exc.message, details=exc.details
     )
 
 
-async def validation_exception_handler(
-    request: Request,
-    exc: RequestValidationError
-):
-    """
-    Handles Pydantic Validation Errors
-    """
-
-    logger.warning(
-        f"Validation Error | {request.method} {request.url.path}"
-    )
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    logger.warning(f"Validation Error | {request.method} {request.url.path}")
 
     errors = []
 
     for error in exc.errors():
-        # Never echo the raw submitted value back (e.g. a mistyped password) -
-        # field + message is enough for the client to fix the form.
-        errors.append({
-            "field": ".".join(
-                map(str, error["loc"])
-            ),
-            "message": error["msg"]
-        })
+        errors.append(
+            {
+                "field": ".".join(map(str, error["loc"])),
+                "message": error["msg"],
+                "type": error["type"],
+            }
+        )
 
     return build_error_response(
-        status_code=422,
-        message="Validation Error",
-        details=errors
+        status_code=422, message="Validation Error", details=errors
     )
 
 
-async def http_exception_handler(
-    request: Request,
-    exc: HTTPException
-):
-    """
-    Handles FastAPI/Starlette HTTP Exceptions (e.g. from HTTPBearer's
-    "Not authenticated" when the Authorization header is missing entirely)
-    """
-
+async def http_exception_handler(request: Request, exc: HTTPException):
     logger.warning(
         f"HTTP Exception | {request.method} {request.url.path} | {exc.detail}"
     )
 
     return build_error_response(
         status_code=exc.status_code,
-        message=str(exc.detail)
+        message=str(exc.detail),
+        headers=exc.headers,
     )
 
 
-async def global_exception_handler(
-    request: Request,
-    exc: Exception
-):
-    """
-    Handles Unexpected Exceptions - full traceback goes to the log only,
-    the client never sees internal details (no SQL, no file paths, no
-    stack trace).
-    """
+async def global_exception_handler(request: Request, exc: Exception):
+    logger.exception(f"Unhandled Exception | {request.method} {request.url.path}")
 
-    logger.exception(
-        f"Unhandled Exception | {request.method} {request.url.path}"
-    )
-
-    return build_error_response(
-        status_code=500,
-        message="Internal Server Error"
-    )
+    return build_error_response(status_code=500, message="Internal Server Error")
 
 
 def register_exception_handlers(app: FastAPI):

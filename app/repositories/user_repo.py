@@ -25,8 +25,13 @@ class UserRepository:
         return db.query(User).filter(User.id == user_id, User.is_deleted == False).first()
 
     @staticmethod
-    def get_all_users(db: Session):
-        return db.query(User).filter(User.is_deleted == False).all()
+    def get_all_users(db: Session, skip: int = 0, limit: int | None = None):
+        query = db.query(User).filter(User.is_deleted == False)
+        if skip or limit is not None:
+            query = query.order_by(User.id).offset(skip)
+        if limit is not None:
+            query = query.limit(limit)
+        return query.all()
 
     @staticmethod
     def get_all_roles(db: Session):

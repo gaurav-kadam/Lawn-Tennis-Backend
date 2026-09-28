@@ -6,13 +6,6 @@ from app.utils.logger import logger
 
 
 class SoftDeleteHelper:
-    """
-    Used by every repository for delete/restore, so this is a shared choke
-    point too - same rollback + DatabaseException contract as
-    app.exceptions.db_safety (kept separate from that module only to avoid a
-    circular import, since db_safety already depends on nothing here).
-    """
-
     @staticmethod
     def soft_delete(db: Session, record, deleted_by: int | None = None):
         from app.exceptions.custom_exceptions import DatabaseException

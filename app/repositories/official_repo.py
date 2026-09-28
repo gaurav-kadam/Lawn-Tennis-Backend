@@ -7,6 +7,13 @@ from app.exceptions.db_safety import safe_commit
 class OfficialRepository:
 
     @staticmethod
+    def count_officials(db: Session, is_active: bool | None = None):
+        query = db.query(Official).filter(Official.is_deleted == False)
+        if is_active is not None:
+            query = query.filter(Official.is_active == is_active)
+        return query.count()
+
+    @staticmethod
     def create_official(db: Session, data: dict):
         official = Official(**data)
         db.add(official)

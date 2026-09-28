@@ -44,12 +44,16 @@ try:
 finally:
     db.close()
 
-origins = [
-    "http://localhost:8081",
-    "http://127.0.0.1:8081",
-    "http://localhost:3000",
-    "http://localhost:4200",
-]
+origins = settings.ALLOWED_ORIGINS or (
+    [
+        "http://localhost:8081",
+        "http://127.0.0.1:8081",
+        "http://localhost:3000",
+        "http://localhost:4200",
+    ]
+    if settings.ENV == "development"
+    else []
+)
 
 app.add_middleware(
     CORSMiddleware,
