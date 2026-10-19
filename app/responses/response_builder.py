@@ -19,5 +19,5 @@ def error_response(message: str, errors=None, status_code: int = 400):
         message=message,
         status_code=status_code,
         data=None,
-        errors=errors,
+        errors=jsonable_encoder(errors) if errors is not None else None,
     )
