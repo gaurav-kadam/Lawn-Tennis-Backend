@@ -7,6 +7,7 @@ from app.schemas.user import UserCreate, UserRegister, UserLogin, UserUpdate
 from app.core.security import hash_password, verify_password, create_access_token
 from app.utils.logger import logger
 from app.services.refresh_token_service import RefreshTokenService
+from app.services.email_service import EmailService
 
 DEFAULT_PUBLIC_ROLE = "Scorer"
 
@@ -49,6 +50,21 @@ class UserService:
             "password": hashed_password,
             "role_id": default_role.role_id,
         })
+
+        try:
+            EmailService.send_registration_email(
+                to=created_user.email,
+                user_name=created_user.name,
+            )
+
+            logger.info(
+                f"Registration email sent: {created_user.email}"
+            )
+
+        except Exception:
+            logger.exception(
+                f"Registration email failed: {created_user.email}"
+            )
 
         return UserService._build_user_response(created_user)
 
@@ -96,6 +112,18 @@ class UserService:
             db=db,
             user_id=existing_user.id,
         )
+        try:
+            EmailService.send_login_success_email(
+                to=existing_user.email,
+                user_name=existing_user.name,
+            )
+            logger.info(
+                f"Login success email sent: {existing_user.email}"
+            )
+        except Exception:
+            logger.exception(
+                f"Login success email failed: {existing_user.email}"
+            )
 
         return {
             "access_token": token,

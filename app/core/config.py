@@ -19,6 +19,16 @@ class Settings:
         os.getenv("REFRESH_TOKEN_EXPIRE_DAYS", 7)
     )
 
+    # Email
+    EMAIL_HOST = os.getenv("EMAIL_HOST", "smtp.gmail.com")
+    EMAIL_PORT = int(os.getenv("EMAIL_PORT", 465))
+    EMAIL_ADDRESS = os.getenv("EMAIL_ADDRESS")
+    EMAIL_PASSWORD = os.getenv("EMAIL_PASSWORD")
+    EMAIL_FROM_NAME = os.getenv(
+        "EMAIL_FROM_NAME",
+        "Final Whistle"
+    )
+
     ENV = os.getenv("ENV", "development")
 
     ALLOWED_ORIGINS = [
