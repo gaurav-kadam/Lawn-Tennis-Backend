@@ -9,3 +9,4 @@ from app.models.match import (
     MatchEvent,
 )
 from app.models.team import Team
+from app.models.user_refresh_token import UserRefreshToken

@@ -6,6 +6,7 @@ from app.schemas.user import UserCreate, UserRegister, UserLogin, UserUpdate
 
 from app.core.security import hash_password, verify_password, create_access_token
 from app.utils.logger import logger
+from app.services.refresh_token_service import RefreshTokenService
 
 DEFAULT_PUBLIC_ROLE = "Scorer"
 
@@ -38,8 +39,6 @@ class UserService:
             None,
         )
         if not default_role:
-            # Should never happen (roles are seeded on startup) but fail safely rather
-            # than silently falling back to some other role.
             logger.error(f"Default public role '{DEFAULT_PUBLIC_ROLE}' not found while registering {user.email}")
             raise BadRequestException("Registration is temporarily unavailable. Please try again later.")
 
@@ -55,8 +54,6 @@ class UserService:
 
     @staticmethod
     def create_user(db: Session, user: UserCreate):
-        """Admin-created user (POST /users - Supervisor only). role_id is trusted
-        because the caller was already authenticated + authorized as Supervisor."""
         logger.info(f"Checking existing user for email: {user.email}")
         existing_user = UserRepository.get_user_by_email(db, user.email)
         if existing_user:
@@ -95,9 +92,14 @@ class UserService:
             "email": existing_user.email,
             "role_name": role_name,
         })
+        refresh_token = RefreshTokenService.create_refresh_token_for_user(
+            db=db,
+            user_id=existing_user.id,
+        )
 
         return {
             "access_token": token,
+            "refresh_token": refresh_token,
             "token_type": "bearer",
             "user": {
                 "id": existing_user.id,

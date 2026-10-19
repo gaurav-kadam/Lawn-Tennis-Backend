@@ -6,6 +6,8 @@ from app.schemas.user import UserRegister, UserLogin
 from app.services.user_service import UserService
 from app.utils.logger import logger
 from app.responses.response_builder import success_response
+from app.schemas.refresh_token import RefreshTokenRequest
+from app.services.refresh_token_service import RefreshTokenService
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
@@ -22,3 +24,18 @@ def login_user(user: UserLogin, db: Session = Depends(get_db)):
     logger.info(f"Login request received for email: {user.email}")
     result = UserService.login_user(db, user)
     return success_response(message="Login successful", data=result)
+
+@router.post("/refresh")
+def refresh_access_token(
+        request: RefreshTokenRequest,
+        db: Session = Depends(get_db),
+):
+    result = RefreshTokenService.refresh_access_token(
+        db=db,
+        refresh_token=request.refresh_token,
+    )
+
+    return success_response(
+        message="Access token refreshed successfully",
+        data=result,
+    )

@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta
-
+import hashlib
+import secrets
 import bcrypt
 from jose import jwt
 from app.core.config import settings
@@ -32,3 +33,18 @@ def create_access_token(data: dict):
     expire = datetime.utcnow() + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     to_encode.update({"exp": expire})
     return jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
+
+def create_refresh_token():
+    return secrets.token_urlsafe(64)
+
+
+def hash_refresh_token(token: str):
+    return hashlib.sha256(
+        token.encode("utf-8")
+    ).hexdigest()
+
+
+def get_refresh_token_expiry():
+    return datetime.utcnow() + timedelta(
+        days=settings.REFRESH_TOKEN_EXPIRE_DAYS
+    )

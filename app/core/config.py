@@ -15,6 +15,9 @@ class Settings:
     ACCESS_TOKEN_EXPIRE_MINUTES = int(
         os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", 60)
     )
+    REFRESH_TOKEN_EXPIRE_DAYS = int(
+        os.getenv("REFRESH_TOKEN_EXPIRE_DAYS", 7)
+    )
 
     ENV = os.getenv("ENV", "development")
 
