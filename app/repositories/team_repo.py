@@ -36,7 +36,7 @@ class TeamRepository:
         total = query.count()
 
         teams = (
-            query.offset((page - 1) * page_size)
+            query.order_by(Team.id).offset((page - 1) * page_size)
             .limit(page_size)
             .all()
         )

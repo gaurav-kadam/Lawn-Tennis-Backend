@@ -29,7 +29,7 @@ class PlayerRepository:
         if is_active is not None:
             query = query.filter(Player.is_active == is_active)
         total = query.count()
-        players = query.offset((page - 1) * page_size).limit(page_size).all()
+        players = query.order_by(Player.id).offset((page - 1) * page_size).limit(page_size).all()
         return players, total
 
     @staticmethod

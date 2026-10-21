@@ -102,9 +102,9 @@ class UserService:
         return UserOTPService.generate_login_otp(db, existing_user)
 
     @staticmethod
-    def get_all_users(db: Session, skip: int = 0, limit: int | None = None):
-        users = UserRepository.get_all_users(db, skip, limit)
-        return [UserService._build_user_response(user) for user in users]
+    def get_all_users(db: Session, page: int = 1, page_size: int = 10):
+        users, total = UserRepository.get_all_users(db, page, page_size)
+        return [UserService._build_user_response(user) for user in users], total
 
     @staticmethod
     def get_all_roles(db: Session):

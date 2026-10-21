@@ -31,7 +31,7 @@ class TournamentRepository:
         if is_active is not None:
             query = query.filter(Tournament.is_active == is_active)
         total = query.count()
-        tournaments = query.offset((page - 1) * page_size).limit(page_size).all()
+        tournaments = query.order_by(Tournament.id).offset((page - 1) * page_size).limit(page_size).all()
         return tournaments, total
 
     @staticmethod

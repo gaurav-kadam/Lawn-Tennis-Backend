@@ -29,7 +29,7 @@ class OfficialRepository:
         if is_active is not None:
             query = query.filter(Official.is_active == is_active)
         total = query.count()
-        officials = query.offset((page - 1) * page_size).limit(page_size).all()
+        officials = query.order_by(Official.id).offset((page - 1) * page_size).limit(page_size).all()
         return officials, total
 
     @staticmethod

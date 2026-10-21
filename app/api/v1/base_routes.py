@@ -28,14 +28,23 @@ def get_roles(current_user=Depends(manage_users), db: Session = Depends(get_db))
 
 @router.get("/users")
 def get_users(
-    skip: int = Query(0, ge=0),
-    limit: int | None = Query(None, ge=1),
-    current_user=Depends(manage_users),
-    db: Session = Depends(get_db),
+        page: int = Query(1, ge=1),
+        page_size: int = Query(10, ge=1),
+        current_user=Depends(manage_users),
+        db: Session = Depends(get_db),
 ):
-    users = UserService.get_all_users(db, skip, limit)
-    return success_response(message="Users fetched successfully", data=users)
+    users, total = UserService.get_all_users(db, page, page_size)
 
+    return success_response(
+        message="Users fetched successfully",
+        data={
+            "items": users,
+            "total": total,
+            "page": page,
+            "page_size": page_size,
+            "total_pages": (total + page_size - 1) // page_size,
+        },
+    )
 
 @router.get("/user/{user_id}")
 def get_user(
