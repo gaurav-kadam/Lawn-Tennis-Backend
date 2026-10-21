@@ -32,3 +32,7 @@ class UserResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+class UserOTPVerify(BaseModel):
+    email: EmailStr
+    otp: str = Field(..., min_length=4, max_length=4, pattern="^[0-9]{4}$")

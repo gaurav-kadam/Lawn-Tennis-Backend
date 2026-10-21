@@ -91,55 +91,15 @@ class UserService:
 
     @staticmethod
     def login_user(db: Session, user: UserLogin):
-        logger.info(f"Login attempt started for: {user.email}")
+        logger.info("Login attempt started for: %s", user.email)
         existing_user = UserRepository.get_user_by_email(db, user.email)
-        if not existing_user:
-            logger.warning(f"Login failed. User not found: {user.email}")
+
+        if not existing_user or not verify_password(user.password, existing_user.password):
+            logger.warning("Login failed for: %s", user.email)
             raise AuthenticationException("Invalid email or password")
 
-        if not verify_password(user.password, existing_user.password):
-            logger.warning(f"Invalid password attempt for: {user.email}")
-            raise AuthenticationException("Invalid email or password")
-
-        role_name = existing_user.role.role_name if existing_user.role else None
-
-        token = create_access_token({
-            "user_id": existing_user.id,
-            "email": existing_user.email,
-            "role_name": role_name,
-        })
-        refresh_token = RefreshTokenService.create_refresh_token_for_user(
-            db=db,
-            user_id=existing_user.id,
-        )
-        try:
-            EmailService.send_login_success_email(
-                to=existing_user.email,
-                user_name=existing_user.name,
-            )
-            logger.info(
-                f"Login success email sent: {existing_user.email}"
-            )
-        except Exception:
-            logger.exception(
-                f"Login success email failed: {existing_user.email}"
-            )
-
-        return {
-            "access_token": token,
-            "refresh_token": refresh_token,
-            "token_type": "bearer",
-            "user": {
-                "id": existing_user.id,
-                "name": existing_user.name,
-                "email": existing_user.email,
-                "role": {
-                    "role_id": existing_user.role.role_id,
-                    "role_name": existing_user.role.role_name,
-                    "is_active": existing_user.role.is_active
-                } if existing_user.role else None
-            }
-        }
+        from app.services.user_otp_service import UserOTPService
+        return UserOTPService.generate_login_otp(db, existing_user)
 
     @staticmethod
     def get_all_users(db: Session, skip: int = 0, limit: int | None = None):

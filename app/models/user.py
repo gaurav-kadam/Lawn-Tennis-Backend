@@ -13,6 +13,11 @@ class User(Base):
 
     role_id = Column(Integer, ForeignKey("tbl_role.role_id"))
     role = relationship("Role")
+    otps = relationship(
+        "UserOTP",
+        back_populates="user",
+        cascade="all, delete-orphan",
+    )
 
     is_deleted = Column(Boolean, default=False, nullable=False)
     deleted_at = Column(DateTime, nullable=True)
